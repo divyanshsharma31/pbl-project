@@ -10,13 +10,22 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    classification_report,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+)
 import warnings
+
 warnings.filterwarnings('ignore')
 
 # ===== PAGE CONFIG =====
 st.set_page_config(
     page_title="AQI Prediction System",
-    page_icon="🌍",
+    page_icon="air",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -55,76 +64,70 @@ st.markdown("""
 HEALTH_EFFECTS_DB = {
     'Good': {
         'range': '0-50',
-        'emoji': '🟢',
         'status': 'SAFE',
         'severity': 1,
         'color': '#28a745',
+        'emoji': '🟢',
         'health_effects': [
-            '✓ No adverse health effects',
-            '✓ Excellent air quality for all activities',
-            '✓ Safe for all population groups'
+            'No adverse health effects',
+            'Excellent air quality for all activities',
+            'Safe for all population groups'
         ],
         'precautions': 'Enjoy outdoor activities freely'
     },
     'Satisfactory': {
         'range': '51-100',
-        'emoji': '🟡',
         'status': 'SAFE',
         'severity': 2,
         'color': '#ffc107',
+        'emoji': '🟡',
         'health_effects': [
-            '⚠ Minor respiratory symptoms in sensitive groups',
-            '⚠ Minimal risk for general population',
-            '⚠ Occasional asthma symptoms'
+            'Minor respiratory symptoms in sensitive groups',
+            'Minimal risk for general population',
+            'Occasional asthma symptoms'
         ],
         'precautions': 'Sensitive individuals should limit prolonged outdoor exposure'
     },
     'Moderately Polluted': {
         'range': '101-150',
-        'emoji': '🟠',
         'status': 'MODERATE HAZARD',
         'severity': 3,
-        'color': '#fd7e14',
-        'health_effects': [
-            '⛔ Respiratory discomfort for sensitive groups',
-            '⛔ Increased asthma attacks and coughing',
-            '⛔ Difficulty breathing for children & elderly'
+        'color': '#fd7e14',        'emoji': '🟠',        'health_effects': [
+            'Respiratory discomfort for sensitive groups',
+            'Increased asthma attacks and coughing',
+            'Difficulty breathing for children & elderly'
         ],
         'precautions': 'Children, elderly, & people with respiratory disease should avoid outdoor activities'
     },
     'Poor': {
         'range': '151-200',
-        'emoji': '🔴',
         'status': 'HAZARDOUS',
         'severity': 4,
-        'color': '#dc3545',
-        'health_effects': [
-            '🚨 Severe respiratory illness in general population',
-            '🚨 Increased heart disease risk',
-            '🚨 Hospital admissions likely to increase'
+        'color': '#dc3545',        'emoji': '🔴',        'health_effects': [
+            'Severe respiratory illness in general population',
+            'Increased heart disease risk',
+            'Hospital admissions likely to increase'
         ],
         'precautions': 'Most people stay indoors; Use N95 masks if outside'
     },
     'Very Poor': {
         'range': '201-300',
-        'emoji': '🟣',
         'status': 'HAZARDOUS',
         'severity': 5,
         'color': '#6f42c1',
+        'emoji': '🟣',
         'health_effects': [
-            '🚨 Life-threatening respiratory illness',
-            '🚨 Severe cardiovascular complications',
-            '🚨 Hospital emergencies & mortality risk'
+            'Life-threatening respiratory illness',
+            'Severe cardiovascular complications',
+            'Hospital emergencies & mortality risk'
         ],
         'precautions': 'All should stay indoors with air filters; Emergency preparedness essential'
     },
     'Severe': {
         'range': '301+',
-        'emoji': '💀',
         'status': 'HAZARDOUS',
         'severity': 6,
-        'color': '#721c24',
-        'health_effects': [
+        'color': '#721c24',        'emoji': '💀',        'health_effects': [
             '💀 Life-threatening conditions for ALL',
             '💀 Respiratory failure and cardiac arrest risk',
             '💀 Mass casualties and mortality possible'
@@ -137,45 +140,45 @@ IMPROVEMENT_MEASURES = {
     'PM2.5': {
         'priority': 'CRITICAL',
         'measures': [
-            '✓ Install air purifiers and HEPA filters in homes',
-            '✓ Reduce industrial emissions enforcement',
-            '✓ Promote electric vehicles over diesel/petrol',
-            '✓ Control construction dust generation',
-            '✓ Implement stricter pollution standards'
+            'Install air purifiers and HEPA filters in homes',
+            'Reduce industrial emissions enforcement',
+            'Promote electric vehicles over diesel/petrol',
+            'Control construction dust generation',
+            'Implement stricter pollution standards'
         ]
     },
     'PM10': {
         'priority': 'CRITICAL',
         'measures': [
-            '✓ Street sweeping and wet cleaning of roads',
-            '✓ Dust control at construction sites',
-            '✓ Water spraying to reduce dust particles',
-            '✓ Vegetative cover on open ground'
+            'Street sweeping and wet cleaning of roads',
+            'Dust control at construction sites',
+            'Water spraying to reduce dust particles',
+            'Vegetative cover on open ground'
         ]
     },
     'Vehicle Count': {
         'priority': 'HIGH',
         'measures': [
-            '✓ Promote public transportation (buses, metro)',
-            '✓ Encourage carpooling and ride-sharing',
-            '✓ Implement odd-even vehicle schemes',
-            '✓ Work from home policies'
+            'Promote public transportation (buses, metro)',
+            'Encourage carpooling and ride-sharing',
+            'Implement odd-even vehicle schemes',
+            'Work from home policies'
         ]
     },
     'Industrial Activity Index': {
         'priority': 'HIGH',
         'measures': [
-            '✓ Enforce green manufacturing practices',
-            '✓ Install scrubbers on industrial chimneys',
-            '✓ Regular stack emission monitoring'
+            'Enforce green manufacturing practices',
+            'Install scrubbers on industrial chimneys',
+            'Regular stack emission monitoring'
         ]
     },
     'NO2': {
         'priority': 'HIGH',
         'measures': [
-            '✓ Control vehicle emissions at source',
-            '✓ Improve fuel quality standards',
-            '✓ Regular vehicle maintenance campaigns'
+            'Control vehicle emissions at source',
+            'Improve fuel quality standards',
+            'Regular vehicle maintenance campaigns'
         ]
     }
 }
@@ -183,8 +186,8 @@ IMPROVEMENT_MEASURES = {
 # ===== LOAD & CACHE DATA & MODELS =====
 @st.cache_resource
 def load_data_and_train_models():
-    """Load data and train models"""
-    df = pd.read_csv('files/indian_aqi_realistic_2019_2024.csv')
+    """Load data and train models (fast path used on all pages)."""
+    df = pd.read_csv('files/station_hour_cleaned.csv')
     
     # Categorize AQI
     def categorize_aqi(aqi_value):
@@ -202,28 +205,107 @@ def load_data_and_train_models():
             return 'Severe'
     
     df['AQI_Category'] = df['AQI'].apply(categorize_aqi)
+    # Numeric month index so model can learn seasonality (1–12)
+    df['MonthIndex'] = (
+        df['Month']
+        .astype(str)
+        .str.split('.')
+        .str[0]
+        .astype(int)
+    )
+    # Add cyclic month encoding for better seasonal patterns
+    df['Month_sin'] = np.sin(2 * np.pi * df['MonthIndex'] / 12)
+    df['Month_cos'] = np.cos(2 * np.pi * df['MonthIndex'] / 12)
     
-    # Features
-    features = ['PM2.5', 'PM10', 'NO2', 'CO', 'SO2', 'O3', 
-                'Temperature (°C)', 'Humidity (%)', 'Wind Speed (km/h)', 
-                'Rainfall (mm)', 'Pressure (hPa)', 'Vehicle Count', 
-                'Industrial Activity Index']
+    # Features - using available columns from dataset
+    features = [
+        'PM2.5',
+        'PM10',
+        'NO',
+        'NO2',
+        'NOx',
+        'NH3',
+        'CO',
+        'SO2',
+        'O3',
+        'Benzene',
+        'Toluene',
+        'Xylene',
+        'Year',
+        'MonthIndex',
+        'Month_sin',
+        'Month_cos',
+    ]
     
-    X = df[features]
-    y_category = df['AQI_Category']
-    y_aqi = df['AQI']
+    # Keep original df with City info and missing values for city selection
+    df_original = df.copy()
     
-    # Train classifier
+    # Remove rows with missing values for model training only
+    df_clean = df[features + ['AQI', 'AQI_Category']].dropna()
+    
+    X = df_clean[features]
+    y_category = df_clean['AQI_Category']
+    y_aqi = df_clean['AQI']
+    
+    # Train classifier (optimized for speed)
     X_train, X_test, y_train, y_test = train_test_split(X, y_category, test_size=0.2, random_state=42)
-    rf_classifier = RandomForestClassifier(n_estimators=100, max_depth=15, random_state=42)
+    rf_classifier = RandomForestClassifier(n_estimators=100, max_depth=15, random_state=42, n_jobs=-1)
     rf_classifier.fit(X_train, y_train)
     
-    # Train regressor
+    # Train regressor (optimized for speed)
     X_train_reg, X_test_reg, y_train_reg, y_test_reg = train_test_split(X, y_aqi, test_size=0.2, random_state=42)
-    rf_regressor = RandomForestRegressor(n_estimators=100, max_depth=15, random_state=42)
+    rf_regressor = RandomForestRegressor(n_estimators=100, max_depth=15, random_state=42, n_jobs=-1)
     rf_regressor.fit(X_train_reg, y_train_reg)
     
-    return df, rf_classifier, rf_regressor, features
+    # Keep train/test sizes for later metrics display
+    data_info = {
+        'n_train': len(X_train),
+        'n_test': len(X_test),
+    }
+    
+    return df_original, rf_classifier, rf_regressor, features, data_info
+
+
+@st.cache_resource
+def compute_classification_metrics(df, rf_classifier, features, data_info):
+    """Compute full classification metrics (only when metrics page is opened)."""
+    df_clean = df[features + ['AQI', 'AQI_Category']].dropna()
+    X = df_clean[features]
+    y_category = df_clean['AQI_Category']
+    
+    _, X_test, _, y_test = train_test_split(
+        X, y_category, test_size=0.2, random_state=42
+    )
+    y_pred = rf_classifier.predict(X_test)
+    labels = sorted(y_category.unique())
+    clf_report = classification_report(y_test, y_pred, labels=labels, zero_division=0)
+    cm = confusion_matrix(y_test, y_pred, labels=labels)
+    
+    # Also print to terminal so you can see it in the console
+    print("\n=== Classification Report (AQI Category) ===")
+    print(clf_report)
+    print("\n=== Confusion Matrix (rows = true, cols = predicted) ===")
+    print(labels)
+    print(cm)
+    
+    metrics = {
+        'accuracy': accuracy_score(y_test, y_pred),
+        'precision_weighted': precision_score(
+            y_test, y_pred, average='weighted', zero_division=0
+        ),
+        'recall_weighted': recall_score(
+            y_test, y_pred, average='weighted', zero_division=0
+        ),
+        'f1_weighted': f1_score(
+            y_test, y_pred, average='weighted', zero_division=0
+        ),
+        'classification_report': clf_report,
+        'confusion_matrix': cm,
+        'labels': labels,
+        'n_train': data_info.get('n_train', None),
+        'n_test': data_info.get('n_test', None),
+    }
+    return metrics
 
 # ===== PREDICTION FUNCTION =====
 def predict_aqi(rf_regressor, rf_classifier, features_list, feature_values):
@@ -255,57 +337,57 @@ def main():
         st.session_state.loaded_city_data = None
     
     # Header
-    st.title("🌍 Air Quality Index (AQI) Prediction System")
-    st.markdown("### 🤖 Powered by Random Forest Machine Learning")
+    st.title("Air Quality Index (AQI) Prediction System")
+    st.markdown("### Powered by Random Forest Machine Learning")
     
-    # Load data and models
-    df, rf_classifier, rf_regressor, features = load_data_and_train_models()
+    # Load data and models (fast path)
+    df, rf_classifier, rf_regressor, features, data_info = load_data_and_train_models()
     
     # Sidebar navigation
-    st.sidebar.markdown("## 📋 Navigation")
+    st.sidebar.markdown("## Navigation")
     page = st.sidebar.radio(
         "Select a page:",
-        ["🏠 Home", "🔮 Predict AQI", "📊 Data Analysis", "📈 Top Recommendations", "ℹ️ About"]
+        ["Home", "Predict AQI", "Data Analysis", "Model Metrics", "Top Recommendations", "About"]
     )
     
-    if page == "🏠 Home":
+    if page == "Home":
         st.header("Welcome to AQI Prediction System")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("📊 Total Records", f"{len(df):,}")
+            st.metric("Total Records", f"{len(df):,}")
         with col2:
-            st.metric("🏙️ Cities Analyzed", df['City'].nunique())
+            st.metric("Cities Analyzed", df['City'].nunique())
         with col3:
-            st.metric("📈 AQI Range", f"{df['AQI'].min():.0f} - {df['AQI'].max():.0f}")
+            st.metric("AQI Range", f"{df['AQI'].min():.0f} - {df['AQI'].max():.0f}")
         
         st.markdown("---")
         st.markdown("""
         ### What is this System?
         
         This AI-powered system uses **Random Forest Machine Learning** to:
-        - 🎯 **Predict AQI categories** (Good → Severe)
-        - 🔴 **Classify air quality** as SAFE or HAZARDOUS
-        - ⚠️ **Show health effects** for each AQI level
-        - 💡 **Suggest improvement measures** to reduce pollution
+        -  **Predict AQI categories** (Good → Severe)
+        -  **Classify air quality** as SAFE or HAZARDOUS
+        -  **Show health effects** for each AQI level
+        -  **Suggest improvement measures** to reduce pollution
         
-        ### 🎯 Three Ways to Use This App:
+        ### Three Ways to Use This App:
         
-        #### 1️⃣ **Quick Scenarios** (No Data Entry)
+        #### 1. Quick Scenarios (No Data Entry)
         > Perfect if you don't have pollutant measurements
         - Select from 4 preset scenarios: Good, Moderate, Poor, Severe
         - Get instant predictions with one click
         - Great for understanding AQI impact levels
         
-        #### 2️⃣ **Real City Data** (Most Practical)
+        #### 2. Real City Data (Most Practical)
         > Use actual data from our dataset
         - Select your city from dropdown
         - Auto-loads historical average pollutant values
         - No manual entry needed!
         - Works for 24 Indian cities
         
-        #### 3️⃣ **Custom Parameters** (Advanced)
+        #### 3. Custom Parameters (Advanced)
         > For detailed analysis
         - Use sliders to adjust values
         - Compare different scenarios
@@ -313,13 +395,13 @@ def main():
         """)
         
         # Show category guide
-        st.markdown("### 📊 AQI Categories at a Glance")
+        st.markdown("### AQI Categories at a Glance")
         
         categories_data = []
         for cat in ['Good', 'Satisfactory', 'Moderately Polluted', 'Poor', 'Very Poor', 'Severe']:
             info = HEALTH_EFFECTS_DB[cat]
             categories_data.append({
-                'Category': f"{info['emoji']} {cat}",
+                'Category': cat,
                 'Range': info['range'],
                 'Status': info['status']
             })
@@ -327,11 +409,11 @@ def main():
         cat_df = pd.DataFrame(categories_data)
         st.table(cat_df)
     
-    elif page == "🔮 Predict AQI":
-        st.header("🔮 Predict AQI for Your City")
+    elif page == "Predict AQI":
+        st.header("Predict AQI for Your City")
         
         # Quick scenarios
-        st.markdown("### ⚡ Quick Scenarios")
+        st.markdown("### Quick Scenarios")
         
         scenario_presets = {
             'Good Air Quality': {
@@ -369,9 +451,9 @@ def main():
         # Get values from selected scenario or from input
         if use_preset:
             preset_values = scenario_presets[selected_scenario]
-            st.info(f"📌 Using preset: **{selected_scenario}**")
+            st.info(f"Using preset: **{selected_scenario}**")
         else:
-            st.markdown("### 📊 Enter or Adjust Values")
+            st.markdown("### Enter or Adjust Values")
         
         # Input columns with sliders for better UX (only show if not using loaded city data)
         if not st.session_state.loaded_city_data:
@@ -381,46 +463,48 @@ def main():
                 if use_preset:
                     pm25 = st.slider("PM2.5 (µg/m³)", 0.0, 500.0, preset_values['pm25'])
                     pm10 = st.slider("PM10 (µg/m³)", 0.0, 500.0, preset_values['pm10'])
-                    no2 = st.slider("NO2 (ppb)", 0.0, 200.0, preset_values['no2'])
+                    no = st.slider("NO (ppb)", 0.0, 500.0, 10.0)
                 else:
                     pm25 = st.slider("PM2.5 (µg/m³)", 0.0, 500.0, 50.0)
                     pm10 = st.slider("PM10 (µg/m³)", 0.0, 500.0, 100.0)
-                    no2 = st.slider("NO2 (ppb)", 0.0, 200.0, 40.0)
+                    no = st.slider("NO (ppb)", 0.0, 500.0, 10.0)
             
             with col2:
                 if use_preset:
-                    co = st.slider("CO (ppm)", 0.0, 5.0, preset_values['co'])
-                    so2 = st.slider("SO2 (ppb)", 0.0, 100.0, preset_values['so2'])
-                    o3 = st.slider("O3 (ppb)", 0.0, 200.0, preset_values['o3'])
+                    no2 = st.slider("NO2 (ppb)", 0.0, 500.0, preset_values['no2'])
+                    nox = st.slider("NOx (ppb)", 0.0, 500.0, 30.0)
+                    nh3 = st.slider("NH3 (ppb)", 0.0, 500.0, 20.0)
                 else:
-                    co = st.slider("CO (ppm)", 0.0, 5.0, 1.0)
-                    so2 = st.slider("SO2 (ppb)", 0.0, 100.0, 20.0)
-                    o3 = st.slider("O3 (ppb)", 0.0, 200.0, 40.0)
+                    no2 = st.slider("NO2 (ppb)", 0.0, 500.0, 40.0)
+                    nox = st.slider("NOx (ppb)", 0.0, 500.0, 30.0)
+                    nh3 = st.slider("NH3 (ppb)", 0.0, 500.0, 20.0)
             
             with col3:
                 if use_preset:
-                    temp = st.slider("Temperature (°C)", -40.0, 60.0, preset_values['temp'])
-                    humidity = st.slider("Humidity (%)", 0.0, 100.0, preset_values['humidity'])
-                    wind = st.slider("Wind Speed (km/h)", 0.0, 50.0, preset_values['wind'])
+                    co = st.slider("CO (ppm)", 0.0, 5.0, preset_values['co'])
+                    so2 = st.slider("SO2 (ppb)", 0.0, 200.0, preset_values['so2'])
+                    o3 = st.slider("O3 (ppb)", 0.0, 500.0, preset_values['o3'])
                 else:
-                    temp = st.slider("Temperature (°C)", -40.0, 60.0, 28.0)
-                    humidity = st.slider("Humidity (%)", 0.0, 100.0, 60.0)
-                    wind = st.slider("Wind Speed (km/h)", 0.0, 50.0, 5.0)
+                    co = st.slider("CO (ppm)", 0.0, 5.0, 1.0)
+                    so2 = st.slider("SO2 (ppb)", 0.0, 200.0, 20.0)
+                    o3 = st.slider("O3 (ppb)", 0.0, 500.0, 40.0)
             
             with col4:
                 if use_preset:
-                    rainfall = st.slider("Rainfall (mm)", 0.0, 500.0, preset_values['rainfall'])
-                    pressure = st.slider("Pressure (hPa)", 900.0, 1100.0, preset_values['pressure'])
-                    vehicles = st.slider("Vehicle Count", 10000.0, 500000.0, preset_values['vehicles'])
-                    industrial = st.slider("Industrial Activity", 0.0, 10.0, preset_values['industrial'])
+                    benzene = st.slider("Benzene (µg/m³)", 0.0, 500.0, 3.0)
+                    toluene = st.slider("Toluene (µg/m³)", 0.0, 500.0, 10.0)
+                    xylene = st.slider("Xylene (µg/m³)", 0.0, 500.0, 2.0)
+                    year = st.slider("Year", 2015, 2024, 2020)
+                    month_index_input = st.slider("Month (1 = Jan, 12 = Dec)", 1, 12, 6)
                 else:
-                    rainfall = st.slider("Rainfall (mm)", 0.0, 500.0, 0.0)
-                    pressure = st.slider("Pressure (hPa)", 900.0, 1100.0, 1013.0)
-                    vehicles = st.slider("Vehicle Count", 10000.0, 500000.0, 100000.0)
-                    industrial = st.slider("Industrial Activity", 0.0, 10.0, 5.0)
+                    benzene = st.slider("Benzene (µg/m³)", 0.0, 500.0, 3.0)
+                    toluene = st.slider("Toluene (µg/m³)", 0.0, 500.0, 10.0)
+                    xylene = st.slider("Xylene (µg/m³)", 0.0, 500.0, 2.0)
+                    year = st.slider("Year", 2015, 2024, 2020)
+                    month_index_input = st.slider("Month (1 = Jan, 12 = Dec)", 1, 12, 6)
         
         st.markdown("---")
-        st.markdown("### 🏙️ OR Use Real City Data from Dataset")
+        st.markdown("### OR Use Real City Data from Dataset")
         
         # Get unique cities from dataset
         cities_in_data = sorted(df['City'].unique().tolist())
@@ -430,32 +514,43 @@ def main():
             selected_city_data = st.selectbox("Select a city:", cities_in_data)
         
         with col2:
-            if st.button("📍 Load Data", use_container_width=True):
+            if st.button("Load Data", use_container_width=True):
                 # Get MEDIAN/AVERAGE values for the selected city (not just first row)
                 city_data_all = df[df['City'] == selected_city_data]
                 city_avg = city_data_all.median(numeric_only=True)  # Use median to avoid outliers
                 
+                # Get global median as fallback for missing values
+                global_avg = df.median(numeric_only=True)
+                
+                # Fill NaN values with global median
+                for col in ['PM2.5', 'PM10', 'NO', 'NO2', 'NOx', 'NH3', 'CO', 'SO2', 'O3', 'Benzene', 'Toluene', 'Xylene']:
+                    if pd.isna(city_avg[col]):
+                        city_avg[col] = global_avg.get(col, 50)
+                
                 # Get the actual median AQI for display
                 median_aqi = city_data_all['AQI'].median()
+                if pd.isna(median_aqi):
+                    # If city has no AQI data, use global median
+                    median_aqi = df['AQI'].median()
                 
                 st.session_state.loaded_city_data = {
                     'pm25': float(city_avg['PM2.5']),
                     'pm10': float(city_avg['PM10']),
+                    'no': float(city_avg['NO']),
                     'no2': float(city_avg['NO2']),
+                    'nox': float(city_avg['NOx']),
+                    'nh3': float(city_avg['NH3']),
                     'co': float(city_avg['CO']),
                     'so2': float(city_avg['SO2']),
                     'o3': float(city_avg['O3']),
-                    'temp': float(city_avg['Temperature (°C)']),
-                    'humidity': float(city_avg['Humidity (%)']),
-                    'wind': float(city_avg['Wind Speed (km/h)']),
-                    'rainfall': float(city_avg['Rainfall (mm)']),
-                    'pressure': float(city_avg['Pressure (hPa)']),
-                    'vehicles': float(city_avg['Vehicle Count']),
-                    'industrial': float(city_avg['Industrial Activity Index']),
+                    'benzene': float(city_avg['Benzene']),
+                    'toluene': float(city_avg['Toluene']),
+                    'xylene': float(city_avg['Xylene']),
+                    'year': int(city_avg.get('Year', 2020)),
                     'city_name': selected_city_data,
                     'median_aqi': int(median_aqi)
                 }
-                st.success(f"✓ Loaded real data for {selected_city_data} (Median AQI: {int(median_aqi)})")
+                st.success(f"Loaded real data for {selected_city_data} (Median AQI: {int(median_aqi)})")
                 st.rerun()
         
         st.markdown("---")
@@ -465,22 +560,101 @@ def main():
             city_data = st.session_state.loaded_city_data
             pm25 = city_data['pm25']
             pm10 = city_data['pm10']
+            no = city_data['no']
             no2 = city_data['no2']
+            nox = city_data['nox']
+            nh3 = city_data['nh3']
             co = city_data['co']
             so2 = city_data['so2']
             o3 = city_data['o3']
-            temp = city_data['temp']
-            humidity = city_data['humidity']
-            wind = city_data['wind']
-            rainfall = city_data['rainfall']
-            pressure = city_data['pressure']
-            vehicles = city_data['vehicles']
-            industrial = city_data['industrial']
+            benzene = city_data['benzene']
+            toluene = city_data['toluene']
+            xylene = city_data['xylene']
+            year = city_data['year']
             city_name = city_data['city_name']
-            st.info(f"📌 Using data for {city_name} (loaded from dataset)")
+            st.info(f"Using data for {city_name} (loaded from dataset)")
+        
+        # Month-wise AQI prediction using dataset
+        st.markdown("---")
+        st.markdown("### Predict AQI by Month (from Dataset)")
+        
+        colm1, colm2, colm3 = st.columns([2, 2, 1])
+        with colm1:
+            month_city = st.selectbox(
+                "Select city for month-wise prediction:",
+                sorted(df['City'].unique()),
+                key="month_city",
+            )
+        with colm2:
+            month_label = st.selectbox(
+                "Select month:",
+                sorted(df['Month'].unique()),
+                key="month_label",
+            )
+        with colm3:
+            use_actual_median = st.checkbox(
+                "Use actual median AQI (from data)", value=False, key="use_actual_median"
+            )
+        
+        if st.button("Predict Month-wise AQI", use_container_width=True):
+            month_subset = df[(df['City'] == month_city) & (df['Month'] == month_label)]
+            if month_subset.empty:
+                st.warning("No data available for the selected city and month.")
+            else:
+                month_median = month_subset.median(numeric_only=True)
+                # MonthIndex for the selected month (1–12)
+                month_index_val = int(str(month_label).split('.')[0])
+
+                feature_values_month = {
+                    'PM2.5': float(month_median['PM2.5']),
+                    'PM10': float(month_median['PM10']),
+                    'NO': float(month_median['NO']),
+                    'NO2': float(month_median['NO2']),
+                    'NOx': float(month_median['NOx']),
+                    'NH3': float(month_median['NH3']),
+                    'CO': float(month_median['CO']),
+                    'SO2': float(month_median['SO2']),
+                    'O3': float(month_median['O3']),
+                    'Benzene': float(month_median['Benzene']),
+                    'Toluene': float(month_median['Toluene']),
+                    'Xylene': float(month_median['Xylene']),
+                    'Year': int(month_median.get('Year', 2020)),
+                    'MonthIndex': month_index_val,
+                }
+                
+                # Add cyclic month encoding for seasonal pattern capture
+                feature_values_month['Month_sin'] = np.sin(2 * np.pi * month_index_val / 12)
+                feature_values_month['Month_cos'] = np.cos(2 * np.pi * month_index_val / 12)
+                
+                if use_actual_median:
+                    aqi_value = float(month_subset['AQI'].median())
+                    aqi_category = categorize_aqi(aqi_value)
+                else:
+                    input_values_month = [feature_values_month[f] for f in features]
+                    aqi_value, aqi_category = predict_aqi(
+                        rf_regressor, rf_classifier, features, input_values_month
+                    )
+                
+                st.markdown("---")
+                st.markdown(f"### Month-wise Prediction for {month_city} ({month_label})")
+                
+                colm_res1, colm_res2, colm_res3 = st.columns(3)
+                effect_info_month = HEALTH_EFFECTS_DB[aqi_category]
+                
+                with colm_res1:
+                    st.metric("AQI Value", f"{aqi_value:.1f}")
+                with colm_res2:
+                    st.metric("Category", aqi_category)
+                with colm_res3:
+                    st.metric("Status", effect_info_month['status'])
+                
+                st.markdown(f"**Health Effects ({aqi_category})**")
+                for effect in effect_info_month['health_effects']:
+                    st.write(effect)
+                st.warning(f"**Precautions:** {effect_info_month['precautions']}")
         
         # Make prediction
-        if st.button("🔮 Predict AQI", use_container_width=True):
+        if st.button("Predict AQI", use_container_width=True):
             # If city data is loaded, use the actual AQI from dataset instead of predicting
             if st.session_state.loaded_city_data:
                 aqi_value = float(st.session_state.loaded_city_data['median_aqi'])
@@ -499,27 +673,35 @@ def main():
                     aqi_category = 'Severe'
             else:
                 # Use prediction for custom values
+                # Create input array in the correct order of features
                 feature_values = {
                     'PM2.5': pm25,
                     'PM10': pm10,
+                    'NO': no,
                     'NO2': no2,
+                    'NOx': nox,
+                    'NH3': nh3,
                     'CO': co,
                     'SO2': so2,
                     'O3': o3,
-                    'Temperature (°C)': temp,
-                    'Humidity (%)': humidity,
-                    'Wind Speed (km/h)': wind,
-                    'Rainfall (mm)': rainfall,
-                    'Pressure (hPa)': pressure,
-                    'Vehicle Count': vehicles,
-                    'Industrial Activity Index': industrial
+                    'Benzene': benzene,
+                    'Toluene': toluene,
+                    'Xylene': xylene,
+                    'Year': year,
+                    'MonthIndex': month_index_input,
                 }
                 
-                aqi_value, aqi_category = predict_aqi(rf_regressor, rf_classifier, features, list(feature_values.values()))
+                # Add cyclic month encoding for seasonal pattern capture
+                feature_values['Month_sin'] = np.sin(2 * np.pi * month_index_input / 12)
+                feature_values['Month_cos'] = np.cos(2 * np.pi * month_index_input / 12)
+                
+                # Create input in correct order
+                input_values = [feature_values[f] for f in features]
+                aqi_value, aqi_category = predict_aqi(rf_regressor, rf_classifier, features, input_values)
             
             # Display prediction
             st.markdown("---")
-            st.markdown("### 📈 Prediction Results")
+            st.markdown("### Prediction Results")
             
             col1, col2, col3 = st.columns(3)
             
@@ -528,12 +710,12 @@ def main():
             with col1:
                 st.metric("AQI Value", f"{aqi_value:.1f}", delta="Air Quality")
             with col2:
-                st.metric("Category", f"{effect_info['emoji']} {aqi_category}")
+                st.metric("Category", aqi_category)
             with col3:
                 st.metric("Status", effect_info['status'])
             
             # Health effects
-            st.markdown(f"### {effect_info['emoji']} Health Impact Warnings")
+            st.markdown("### Health Impact Warnings")
             
             if effect_info['severity'] <= 2:
                 alert_type = "success"
@@ -550,7 +732,7 @@ def main():
             st.warning(f"**Precautions:** {effect_info['precautions']}")
             
             # Recommendations
-            st.markdown(f"### 💡 Recommended Improvements for {city_name}")
+            st.markdown(f"### Recommended Improvements for {city_name}")
             
             feature_importance_list = [
                 ('PM2.5', 0.0770),
@@ -567,8 +749,8 @@ def main():
                     for measure in measures['measures'][:3]:
                         st.write(measure)
     
-    elif page == "📊 Data Analysis":
-        st.header("📊 Data Analysis & Visualization")
+    elif page == "Data Analysis":
+        st.header("Data Analysis & Visualization")
         
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -618,8 +800,54 @@ def main():
         ax.set_xlabel('Average AQI')
         st.pyplot(fig)
     
-    elif page == "📈 Top Recommendations":
-        st.header("📈 Top Recommendations to Reduce AQI")
+    elif page == "Model Metrics":
+        st.header("Model Evaluation Metrics")
+        
+        # Compute metrics lazily so they are only calculated
+        # when this page is opened (avoids slowing app startup).
+        model_metrics = compute_classification_metrics(df, rf_classifier, features, data_info)
+        
+        st.markdown("### Overall Performance on Test Data")
+        colm1, colm2, colm3, colm4 = st.columns(4)
+        with colm1:
+            st.metric("Accuracy", f"{model_metrics['accuracy']:.3f}")
+        with colm2:
+            st.metric("Precision (weighted)", f"{model_metrics['precision_weighted']:.3f}")
+        with colm3:
+            st.metric("Recall (weighted)", f"{model_metrics['recall_weighted']:.3f}")
+        with colm4:
+            st.metric("F1-score (weighted)", f"{model_metrics['f1_weighted']:.3f}")
+        
+        st.markdown(
+            f"**Train samples:** {model_metrics['n_train']} &nbsp;&nbsp; "
+            f"**Test samples:** {model_metrics['n_test']}"
+        )
+        
+        st.markdown("---")
+        st.markdown("### Detailed Classification Report")
+        st.text(model_metrics['classification_report'])
+        
+        st.markdown("---")
+        st.markdown("### Confusion Matrix")
+        cm = model_metrics['confusion_matrix']
+        labels = model_metrics['labels']
+        
+        fig_cm, ax_cm = plt.subplots(figsize=(6, 4))
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt='d',
+            cmap='Blues',
+            xticklabels=labels,
+            yticklabels=labels,
+            ax=ax_cm,
+        )
+        ax_cm.set_xlabel('Predicted')
+        ax_cm.set_ylabel('True')
+        st.pyplot(fig_cm)
+    
+    elif page == "Top Recommendations":
+        st.header("Top Recommendations to Reduce AQI")
         
         recommendations = [
             {
@@ -700,11 +928,11 @@ def main():
             
             st.markdown("---")
     
-    elif page == "ℹ️ About":
-        st.header("ℹ️ About this System")
+    elif page == "About":
+        st.header("About this System")
         
         st.markdown("""
-        ### 🎓 Project Overview
+        ### Project Overview
         
         This **Random Forest Machine Learning** system predicts Air Quality Index (AQI) and provides:
         
@@ -713,15 +941,15 @@ def main():
         - **Improvement Measures** - Suggests actionable solutions based on feature importance
         - **Data-Driven Insights** - Analyzes 10,000+ records from 24 Indian cities (2019-2024)
         
-        ### 🚀 Key Features
+        ### Key Features
         
-        ✅ Real-time AQI prediction for any city
-        ✅ Comprehensive health effect warnings
-        ✅ Evidence-based improvement recommendations
-        ✅ Interactive data visualizations
-        ✅ Historical trend analysis
+        - Real-time AQI prediction for any city
+        - Comprehensive health effect warnings
+        - Evidence-based improvement recommendations
+        - Interactive data visualizations
+        - Historical trend analysis
         
-        ### 🔬 Technical Details
+        ### Technical Details
         
         - **Model Type:** Random Forest Classifier & Regressor
         - **Features Used:** 13 environmental and pollution indicators
@@ -729,18 +957,18 @@ def main():
         - **Cities Covered:** 24 Indian cities
         - **Time Period:** 2019-2024
         
-        ### 📊 AQI Scale
+        ### AQI Scale
         
         | Category | Range | Status |
         |----------|-------|--------|
-        | 🟢 Good | 0-50 | SAFE |
-        | 🟡 Satisfactory | 51-100 | SAFE |
-        | 🟠 Moderately Polluted | 101-150 | MODERATE HAZARD |
-        | 🔴 Poor | 151-200 | HAZARDOUS |
-        | 🟣 Very Poor | 201-300 | HAZARDOUS |
-        | 💀 Severe | 301+ | HAZARDOUS |
+        | Good | 0-50 | SAFE |
+        | Satisfactory | 51-100 | SAFE |
+        | Moderately Polluted | 101-150 | MODERATE HAZARD |
+        | Poor | 151-200 | HAZARDOUS |
+        | Very Poor | 201-300 | HAZARDOUS |
+        | Severe | 301+ | HAZARDOUS |
         
-        ### 👨‍💼 Use Cases
+        ### Use Cases
         
         - **Public Health:** Early warning systems for hazardous air quality
         - **Policy Making:** Data-driven recommendations for pollution control
@@ -748,7 +976,7 @@ def main():
         - **Research:** Study air quality patterns and trends
         - **Education:** Learn about air pollution and health impacts
         
-        ### 📞 Support
+        ### Support
         
         For more information, check the project documentation or consult the data analysis section.
         """)
