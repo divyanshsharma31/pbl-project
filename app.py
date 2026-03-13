@@ -187,7 +187,7 @@ IMPROVEMENT_MEASURES = {
 @st.cache_resource
 def load_data_and_train_models():
     """Load data and train models (fast path used on all pages)."""
-    df = pd.read_csv('files/station_hour_cleaned.csv')
+    df = pd.read_csv("https://drive.google.com/uc?export=download&id=1QWBPeGqk1zVtpv6xLvJ3ynIBbOZ6rZYE")
     
     # Categorize AQI
     def categorize_aqi(aqi_value):
