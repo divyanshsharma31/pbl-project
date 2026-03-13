@@ -4,3 +4,4 @@ __pycache__/
 *.pkl
 *.joblib
 .ipynb_checkpoints/
+aqi_dataset.csv
