@@ -92,7 +92,9 @@ HEALTH_EFFECTS_DB = {
         'range': '101-150',
         'status': 'MODERATE HAZARD',
         'severity': 3,
-        'color': '#fd7e14',        'emoji': '🟠',        'health_effects': [
+        'color': '#fd7e14',
+        'emoji': '🟠',
+        'health_effects': [
             'Respiratory discomfort for sensitive groups',
             'Increased asthma attacks and coughing',
             'Difficulty breathing for children & elderly'
@@ -103,7 +105,9 @@ HEALTH_EFFECTS_DB = {
         'range': '151-200',
         'status': 'HAZARDOUS',
         'severity': 4,
-        'color': '#dc3545',        'emoji': '🔴',        'health_effects': [
+        'color': '#dc3545',
+        'emoji': '🔴',
+        'health_effects': [
             'Severe respiratory illness in general population',
             'Increased heart disease risk',
             'Hospital admissions likely to increase'
@@ -127,7 +131,9 @@ HEALTH_EFFECTS_DB = {
         'range': '301+',
         'status': 'HAZARDOUS',
         'severity': 6,
-        'color': '#721c24',        'emoji': '💀',        'health_effects': [
+        'color': '#721c24',
+        'emoji': '💀',
+        'health_effects': [
             '💀 Life-threatening conditions for ALL',
             '💀 Respiratory failure and cardiac arrest risk',
             '💀 Mass casualties and mortality possible'
@@ -186,37 +192,79 @@ IMPROVEMENT_MEASURES = {
 # ===== LOAD & CACHE DATA & MODELS =====
 @st.cache_resource
 def load_data_and_train_models():
-    """Load data and train models (fast path used on all pages)."""
-    df = pd.read_csv("https://drive.google.com/uc?export=download&id=1QWBPeGqk1zVtpv6xLvJ3ynIBbOZ6rZYE")
+    import gdown
+    import os
+
+    file_id = "1QWBPeGqk1zVtpv6xLvJ3ynIBbOZ6rZYE"
+    url = f"https://drive.google.com/uc?id={file_id}"
+
+    if not os.path.exists("aqi_dataset.csv"):
+        gdown.download(url, "aqi_dataset.csv", quiet=False)
+
+    df = pd.read_csv("aqi_dataset.csv")
+
+    # clean column names
+    df.columns = df.columns.str.strip()
     
-    # Categorize AQI
-    def categorize_aqi(aqi_value):
-        if aqi_value <= 50:
-            return 'Good'
-        elif aqi_value <= 100:
-            return 'Satisfactory'
-        elif aqi_value <= 150:
-            return 'Moderately Polluted'
-        elif aqi_value <= 200:
-            return 'Poor'
-        elif aqi_value <= 300:
-            return 'Very Poor'
+    # Create mapping from Station IDs to City names
+    station_to_city_mapping = {
+        'AP001': 'Hyderabad', 'AP005': 'Visakhapatnam',
+        'AS001': 'Guwahati',
+        'BR005': 'Patna', 'BR006': 'Gaya', 'BR007': 'Muzaffarpur', 'BR008': 'Bhagalpur',
+        'CG001': 'Raipur', 'CG005': 'Bilaspur',
+        'DL001': 'Delhi', 'DL002': 'Delhi', 'DL003': 'Delhi', 'DL004': 'Delhi', 'DL005': 'Delhi', 'DL007': 'Delhi',
+        'GA001': 'Panaji',
+        'GJ001': 'Ahmedabad', 'GJ005': 'Surat', 'GJ006': 'Vadodara',
+        'HR001': 'Faridabad', 'HR002': 'Hisar',
+        'HP001': 'Shimla',
+        'JK001': 'Srinagar',
+        'JH001': 'Jamshedpur',
+        'KA001': 'Bangalore', 'KA005': 'Mangalore',
+        'KL001': 'Kochi',
+        'MP001': 'Indore', 'MP002': 'Bhopal',
+        'MH001': 'Mumbai', 'MH002': 'Mumbai', 'MH005': 'Pune', 'MH006': 'Aurangabad',
+        'MN001': 'Imphal',
+        'OR001': 'Bhubaneswar',
+        'PB001': 'Amritsar', 'PB002': 'Ludhiana',
+        'RJ001': 'Jaipur', 'RJ005': 'Jodhpur',
+        'TN001': 'Chennai', 'TN005': 'Coimbatore',
+        'TR001': 'Agra',
+        'UP001': 'Lucknow', 'UP002': 'Kanpur', 'UP007': 'Varanasi',
+        'UT001': 'Dehradun',
+        'WB001': 'Kolkata', 'WB005': 'South 24 Parganas'
+    }
+    
+    # Map StationId to City name, use StationId if mapping not found
+    df["City"] = df["StationId"].map(station_to_city_mapping).fillna(df["StationId"])
+    
+    # convert datetime
+    df["Datetime"] = pd.to_datetime(df["Datetime"])
+
+    # extract time features
+    df["MonthIndex"] = df["Datetime"].dt.month
+    df["Year"] = df["Datetime"].dt.year
+
+    # cyclic encoding
+    df["Month_sin"] = np.sin(2 * np.pi * df["MonthIndex"] / 12)
+    df["Month_cos"] = np.cos(2 * np.pi * df["MonthIndex"] / 12)
+
+    # categorize AQI
+    def categorize_aqi(aqi):
+        if aqi <= 50:
+            return "Good"
+        elif aqi <= 100:
+            return "Satisfactory"
+        elif aqi <= 150:
+            return "Moderately Polluted"
+        elif aqi <= 200:
+            return "Poor"
+        elif aqi <= 300:
+            return "Very Poor"
         else:
-            return 'Severe'
-    
-    df['AQI_Category'] = df['AQI'].apply(categorize_aqi)
-    # Numeric month index so model can learn seasonality (1–12)
-    df['MonthIndex'] = (
-        df['Month']
-        .astype(str)
-        .str.split('.')
-        .str[0]
-        .astype(int)
-    )
-    # Add cyclic month encoding for better seasonal patterns
-    df['Month_sin'] = np.sin(2 * np.pi * df['MonthIndex'] / 12)
-    df['Month_cos'] = np.cos(2 * np.pi * df['MonthIndex'] / 12)
-    
+            return "Severe"
+
+    df["AQI_Category"] = df["AQI"].apply(categorize_aqi)
+
     # Features - using available columns from dataset
     features = [
         'PM2.5',
@@ -236,33 +284,33 @@ def load_data_and_train_models():
         'Month_sin',
         'Month_cos',
     ]
-    
+
     # Keep original df with City info and missing values for city selection
     df_original = df.copy()
-    
+
     # Remove rows with missing values for model training only
     df_clean = df[features + ['AQI', 'AQI_Category']].dropna()
-    
+
     X = df_clean[features]
     y_category = df_clean['AQI_Category']
     y_aqi = df_clean['AQI']
-    
+
     # Train classifier (optimized for speed)
     X_train, X_test, y_train, y_test = train_test_split(X, y_category, test_size=0.2, random_state=42)
     rf_classifier = RandomForestClassifier(n_estimators=100, max_depth=15, random_state=42, n_jobs=-1)
     rf_classifier.fit(X_train, y_train)
-    
+
     # Train regressor (optimized for speed)
     X_train_reg, X_test_reg, y_train_reg, y_test_reg = train_test_split(X, y_aqi, test_size=0.2, random_state=42)
     rf_regressor = RandomForestRegressor(n_estimators=100, max_depth=15, random_state=42, n_jobs=-1)
     rf_regressor.fit(X_train_reg, y_train_reg)
-    
+
     # Keep train/test sizes for later metrics display
     data_info = {
         'n_train': len(X_train),
         'n_test': len(X_test),
     }
-    
+
     return df_original, rf_classifier, rf_regressor, features, data_info
 
 
@@ -573,6 +621,9 @@ def main():
             year = city_data['year']
             city_name = city_data['city_name']
             st.info(f"Using data for {city_name} (loaded from dataset)")
+        else:
+            # city_name is already set from the text input on line 466
+            pass
         
         # Month-wise AQI prediction using dataset
         st.markdown("---")
@@ -586,9 +637,13 @@ def main():
                 key="month_city",
             )
         with colm2:
+            month_options = sorted(df['MonthIndex'].unique())
+            month_names = {1: "January", 2: "February", 3: "March", 4: "April", 5: "May", 6: "June",
+                          7: "July", 8: "August", 9: "September", 10: "October", 11: "November", 12: "December"}
             month_label = st.selectbox(
                 "Select month:",
-                sorted(df['Month'].unique()),
+                month_options,
+                format_func=lambda x: month_names.get(x, str(x)),
                 key="month_label",
             )
         with colm3:
@@ -597,13 +652,13 @@ def main():
             )
         
         if st.button("Predict Month-wise AQI", use_container_width=True):
-            month_subset = df[(df['City'] == month_city) & (df['Month'] == month_label)]
+            month_subset = df[(df['City'] == month_city) & (df['MonthIndex'] == month_label)]
             if month_subset.empty:
                 st.warning("No data available for the selected city and month.")
             else:
                 month_median = month_subset.median(numeric_only=True)
                 # MonthIndex for the selected month (1–12)
-                month_index_val = int(str(month_label).split('.')[0])
+                month_index_val = int(month_label)
 
                 feature_values_month = {
                     'PM2.5': float(month_median['PM2.5']),
